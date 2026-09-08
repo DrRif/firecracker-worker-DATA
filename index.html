@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proforma Scan &rarr; Data Entry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1C2B33; --paper:#F6F4EF; --panel:#FFFFFF; --line:#DCD7CE;
+    --teal:#2E7D6B; --teal-dark:#20554A; --amber:#C77D2E; --red:#B3432E; --muted:#7A7267;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',system-ui,sans-serif; font-size:14px; line-height:1.5;}
+  h1,h2,h3{font-family:'Source Serif 4', Georgia, serif; margin:0; font-weight:600;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  header.top{
+    padding:22px 28px 18px; border-bottom:1px solid var(--line); background:var(--panel);
+    position:sticky; top:0; z-index:20; display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  header.top h1{font-size:22px; color:var(--teal-dark);}
+  header.top .eyebrow{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:4px;}
+  header.top .stat{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--teal-dark); background:#EAF3F0; border:1px solid #CFE3DC; padding:6px 12px; border-radius:20px;}
+  main.layout{display:grid; grid-template-columns:340px 1fr 260px; gap:0; min-height:calc(100vh - 78px); align-items:start;}
+  @media (max-width: 980px){ main.layout{grid-template-columns:1fr;} }
+  .col{padding:20px; border-right:1px solid var(--line);}
+  .col:last-child{border-right:none;}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-bottom:16px;}
+  .panel h2{font-size:15px; margin-bottom:10px; color:var(--teal-dark);}
+  .drop{border:1.5px dashed #B9CFC7; border-radius:8px; padding:22px 14px; text-align:center; color:var(--muted); cursor:pointer; transition:.15s; background:#FBFAF7; display:block;}
+  .drop:hover, .drop.drag{ border-color:var(--teal); background:#EFF6F3; color:var(--teal-dark); }
+  .drop input{display:none;}
+  .thumbs{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .thumb{position:relative; width:56px; height:56px; border-radius:6px; overflow:hidden; border:1px solid var(--line);}
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .thumb button{position:absolute; top:1px; right:1px; background:rgba(28,43,51,.75); color:#fff; border:none; width:16px; height:16px; border-radius:50%; font-size:10px; line-height:16px; cursor:pointer; padding:0;}
+  button.primary{width:100%; background:var(--teal); color:#fff; border:none; padding:11px 14px; border-radius:8px; font-weight:600; font-size:13.5px; cursor:pointer; margin-top:12px; transition:.15s;}
+  button.primary:hover{background:var(--teal-dark);}
+  button.primary:disabled{background:#B9CBC5; cursor:not-allowed;}
+  button.ghost{width:100%; background:transparent; color:var(--teal-dark); border:1px solid var(--line); padding:9px 14px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; margin-top:8px;}
+  button.ghost:hover{border-color:var(--teal);}
+  button.small{background:transparent; border:1px solid var(--line); color:var(--muted); border-radius:6px; font-size:11px; padding:3px 8px; cursor:pointer;}
+  .progress-wrap{margin-top:14px;}
+  .progress-track{background:#E8E4DA; border-radius:6px; height:6px; overflow:hidden;}
+  .progress-bar{background:var(--teal); height:100%; width:0%; transition:width .3s;}
+  .progress-label{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); margin-top:6px;}
+  .note{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5;}
+  details.section{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:12px; overflow:hidden;}
+  details.section summary{list-style:none; cursor:pointer; padding:12px 16px; font-weight:600; font-size:13.5px; display:flex; justify-content:space-between; align-items:center; color:var(--teal-dark); background:#FBFAF7; border-bottom:1px solid transparent;}
+  details.section[open] summary{border-bottom-color:var(--line);}
+  summary::-webkit-details-marker{display:none;}
+  summary .count{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); font-weight:400;}
+  .field-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; padding:14px 16px;}
+  @media (max-width:640px){.field-grid{grid-template-columns:1fr;}}
+  .field{display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:11.5px; color:var(--muted); line-height:1.3;}
+  .field input, .field select{border:1px solid var(--line); border-radius:6px; padding:7px 9px; font-size:13px; font-family:inherit; background:#fff; color:var(--ink);}
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--teal); }
+  .field.computed input{ background:#F2F7F5; color:var(--teal-dark); font-family:'IBM Plex Mono',monospace; }
+  .queue-item{border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:var(--panel); cursor:pointer;}
+  .queue-item:hover{border-color:var(--teal);}
+  .queue-item .qname{font-weight:600; font-size:13px;}
+  .queue-item .qid{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);}
+  .queue-item .qdel{float:right; color:var(--red); font-size:11px; background:none; border:none; cursor:pointer;}
+  .empty-state{color:var(--muted); font-size:12.5px; text-align:center; padding:30px 10px;}
+  .badge{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; padding:2px 7px; border-radius:10px; background:#EAF3F0; color:var(--teal-dark); border:1px solid #CFE3DC;}
+  .toast{position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; opacity:0; pointer-events:none; transition:.25s; z-index:50; max-width:90vw; text-align:center;}
+  .toast.show{opacity:1; transform:translate(-50%,-6px);}
+  .signature{margin-top:6px; padding-top:10px; border-top:1px dashed var(--line); font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--muted);}
+
+  #gate{
+    position:fixed; inset:0; background:var(--paper); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  #gate .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:28px; max-width:340px; width:100%;}
+  #gate h1{font-size:19px; color:var(--teal-dark); margin-bottom:6px;}
+  #gate p{font-size:13px; color:var(--muted); margin:0 0 16px;}
+  #gate input{width:100%; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:10px;}
+  #gate .error{color:var(--red); font-size:12.5px; margin-bottom:8px; display:none;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="card">
+    <h1>Sivakasi Firecracker Worker Study</h1>
+    <p>Enter the app password given to you by Dr. Aarif.</p>
+    <div class="error" id="gateError">That password wasn't right — try again.</div>
+    <input type="password" id="gatePassword" placeholder="App password" autofocus>
+    <button class="primary" id="gateSubmit" style="margin-top:0;">Enter</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+
+<header class="top">
+  <div>
+    <div class="eyebrow">Sivakasi Firecracker Worker Study</div>
+    <h1>Proforma Scan &rarr; Data Entry</h1>
+  </div>
+  <div class="stat" id="statBadge">0 workers saved</div>
+</header>
+
+<main class="layout">
+
+  <div class="col">
+    <div class="panel">
+      <h2>1 &middot; Upload this worker's pages</h2>
+      <label class="drop" id="dropZone">
+        <input type="file" id="fileInput" accept="image/*" multiple>
+        <div id="dropText">Tap to select photos<br><span class="mono" style="font-size:11px;">(all pages of one proforma)</span></div>
+      </label>
+      <div class="thumbs" id="thumbs"></div>
+      <button class="primary" id="extractBtn" disabled>Extract data from photos</button>
+      <div class="progress-wrap" id="progressWrap" style="display:none;">
+        <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="progress-label" id="progressLabel">Starting&hellip;</div>
+      </div>
+      <div class="note">Claude reads the handwriting page by page and fills in the form on the right. Always check the filled-in answers before saving.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Saved workers</h2>
+      <div id="queueList"><div class="empty-state">Loading&hellip;</div></div>
+      <button class="ghost" id="refreshBtn">Refresh list</button>
+      <button class="ghost" id="exportBtn">Export all to Excel</button>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="panel" style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 style="margin-bottom:2px;">2 &middot; Review &amp; correct</h2>
+        <div class="note" style="margin-top:0;">Edit any field, then save this worker.</div>
+      </div>
+      <div><button class="small" id="newFormBtn">New blank form</button></div>
+    </div>
+    <div id="formSections"></div>
+    <button class="primary" id="saveBtn" style="margin-bottom:40px;">Save this worker to the dataset</button>
+  </div>
+
+  <div class="col">
+    <div class="panel">
+      <h2>How this works</h2>
+      <div class="note" style="margin-top:0;">
+        1. Photograph every page of one worker's filled proforma.<br><br>
+        2. Upload all of that worker's photos together, then tap Extract.<br><br>
+        3. Claude reads the pages in 7 passes and fills the form.<br><br>
+        4. Check the filled answers, fix anything misread, then save.<br><br>
+        5. Repeat for the next worker. Data is stored centrally &mdash; export to Excel any time, from any device.
+      </div>
+      <div class="signature">201 fields &middot; auto BMI &amp; WHO-5 scoring &middot; data stored centrally</div>
+    </div>
+  </div>
+
+</main>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FULL_FIELDS = [{"section": "ID", "sectionLabel": "IDENTIFICATION", "header": "S.No", "kind": "num", "options": null}, {"section": "ID", "sectionLabel": "IDENTIFICATION", "header": "Participant ID", "kind": "text", "options": null}, {"section": "ID", "sectionLabel": "IDENTIFICATION", "header": "Date of Data Collection", "kind": "date", "options": null}, {"section": "ID", "sectionLabel": "IDENTIFICATION", "header": "Factory Name", "kind": "text", "options": null}, {"section": "ID", "sectionLabel": "IDENTIFICATION", "header": "Process Group (Ergonomic Checklist)", "kind": "dropdown", "options": ["Mixing", "Filling", "Drying", "Packing", "Pellet making", "Burning waste", "Fuse making"]}, {"section": "ID", "sectionLabel": "IDENTIFICATION", "header": "Ergonomic Risk Level", "kind": "dropdown", "options": ["High", "Medium", "Low"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Name", "kind": "text", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Age (years)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Gender", "kind": "dropdown", "options": ["Male", "Female", "Others"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Address", "kind": "text", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Place of Residence", "kind": "dropdown", "options": ["Urban", "Rural"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Literacy Status (Can Read/Write)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Highest Educational Qualification", "kind": "dropdown", "options": ["No formal education", "Primary school", "Middle school", "High school", "Higher secondary school", "Graduate/Degree/Diploma"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Type of Employment", "kind": "dropdown", "options": ["Permanent", "Temporary", "Daily wage"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Any Previous Employment", "kind": "text", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Marital Status", "kind": "dropdown", "options": ["Married", "Unmarried", "Separated", "Divorced", "Widow/Widower"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "No. of Children", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Number of Family Members", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Type of House", "kind": "dropdown", "options": ["Pucca", "Kutcha", "Semi-pucca"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Ownership of House", "kind": "dropdown", "options": ["Owned", "Rented", "Temporary", "Employer provided"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Household Members Engaged in Firecracker Work", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Avg. Monthly Income from this Work (Rs)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Monthly Family Income (Rs)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Income via Firecracker Work (Rs)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Income via Other Occupation (Rs)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Socio-Economic Status (Modified BG Prasad)", "kind": "dropdown", "options": ["Class I", "Class II", "Class III", "Class IV", "Class V"]}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Height (cm)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "Weight (kg)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "BMI (auto)", "kind": "formula", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "BP Systolic (mmHg)", "kind": "num", "options": null}, {"section": "SOC", "sectionLabel": "I. SOCIO-DEMOGRAPHIC DETAILS", "header": "BP Diastolic (mmHg)", "kind": "num", "options": null}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Years Working in Firecracker Industry", "kind": "num", "options": null}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Current Job Role", "kind": "dropdown", "options": ["Mixing", "Filling", "Rolling", "Packing", "Quality check", "Loading/unloading", "Others"]}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Work Pattern", "kind": "dropdown", "options": ["Full year", "Seasonal", "Occasional"]}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Hours Worked per Day", "kind": "num", "options": null}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Days Worked per Week", "kind": "num", "options": null}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Receives Breaks during Work Day", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "If Yes, Break Duration", "kind": "text", "options": null}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "Receives Employment Benefits", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "OCC", "sectionLabel": "II. FIRECRACKER OCCUPATION INFO", "header": "If Yes, Specify (PF/ESI/Bonus/Paid leave/Others)", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Diabetes Mellitus - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Diabetes Mellitus - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Diabetes Mellitus - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Diabetes Mellitus - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Hypertension - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Hypertension - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Hypertension - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Hypertension - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cardiovascular Disease - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cardiovascular Disease - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cardiovascular Disease - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cardiovascular Disease - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cerebrovascular Disease - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cerebrovascular Disease - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cerebrovascular Disease - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Cerebrovascular Disease - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "COPD/Asthma - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "COPD/Asthma - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "COPD/Asthma - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "COPD/Asthma - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Thyroid - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Thyroid - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Thyroid - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Thyroid - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Dermatological Problems - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Dermatological Problems - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Dermatological Problems - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Dermatological Problems - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Other Co-morbidity - Specify Name", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Other Co-morbidity - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Other Co-morbidity - Duration of Illness", "kind": "text", "options": null}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Other Co-morbidity - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "COM", "sectionLabel": "IV.1 CO-MORBIDITIES", "header": "Other Co-morbidity - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "INJ", "sectionLabel": "IV.2 INJURY", "header": "Injury in Past 12 Months", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "INJ", "sectionLabel": "IV.2 INJURY", "header": "Number of Injuries (if Yes)", "kind": "num", "options": null}, {"section": "INJ", "sectionLabel": "IV.2 INJURY", "header": "See 'Injury Details' Sheet for Full Records", "kind": "text", "options": null}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Currently Smokes Tobacco / Smoked in Last Month", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Ever Had Asthma", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Ever Had Pneumonia", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Ever Had Tuberculosis", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Ever Had Other Lung Problem (specify)", "kind": "text", "options": null}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: Shortness of Breath", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: SOB Walking Fast / Incline", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: SOB Walking with Others at Ordinary Pace", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: Must Stop for Breath at Own Pace", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: SOB Interferes with Job", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: Cough", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: Wheeze", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: Chest Pain", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "RESP", "sectionLabel": "IV.3 RESPIRATORY ILLNESS (OSHA)", "header": "Symptom: Other (specify)", "kind": "text", "options": null}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Ever Had Ear Injury / Broken Eardrum", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Difficulty Hearing", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Wears a Hearing Aid", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Any Other Hearing/Ear Problem (specify)", "kind": "text", "options": null}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Rinne's Test - Right Ear (AC vs BC)", "kind": "text", "options": null}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Rinne's Test - Left Ear (AC vs BC)", "kind": "text", "options": null}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Rinne's Test - Inference", "kind": "dropdown", "options": ["Normal", "Abnormal"]}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Schwabach's Test - Right Ear", "kind": "text", "options": null}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Schwabach's Test - Left Ear", "kind": "text", "options": null}, {"section": "HEAR", "sectionLabel": "IV.4 HEARING (OSHA)", "header": "Schwabach's Test - Inference", "kind": "dropdown", "options": ["Normal", "Abnormal"]}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "Ever Lost Vision (Temp/Perm) in Either Eye", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "If Yes, Which Eye", "kind": "dropdown", "options": ["Right eye", "Left eye", "Both eyes", "NA"]}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "Wears Contact Lenses", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "Wears Glasses", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "Colour Blind", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "Any Other Eye Problem (specify)", "kind": "text", "options": null}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "WHO Distance Vision - Right Eye", "kind": "text", "options": null}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "WHO Distance Vision - Left Eye", "kind": "text", "options": null}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "WHO Near Vision - Right Eye", "kind": "text", "options": null}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "WHO Near Vision - Left Eye", "kind": "text", "options": null}, {"section": "VIS", "sectionLabel": "IV.5 VISION (OSHA)", "header": "Vision Inference", "kind": "dropdown", "options": ["Normal", "Abnormal"]}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO1: I have felt cheerful and in good spirits (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO2: I have felt calm and relaxed (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO3: I have felt active and vigorous (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO4: I woke up feeling fresh and rested (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO5: My daily life has been filled with things that interest me (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO-5 Raw Score (0-25, auto)", "kind": "formula", "options": null}, {"section": "MEN", "sectionLabel": "IV.6 MENTAL HEALTH (WHO-5)", "header": "WHO-5 Percentage Score (0-100, auto)", "kind": "formula", "options": null}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Respondent Sex (for norm reference)", "kind": "dropdown", "options": ["Female", "Male"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Neck - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Neck - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Neck - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Shoulder (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Shoulder (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Shoulder (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Shoulder (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Shoulder (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Shoulder (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Back - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Back - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Back - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Arm (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Arm (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Arm (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Arm (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Arm (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Upper Arm (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Back - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Back - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Back - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Forearm (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Forearm (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Forearm (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Forearm (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Forearm (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Forearm (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Wrist (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Wrist (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Wrist (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Wrist (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Wrist (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Wrist (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Hip/Buttocks - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Hip/Buttocks - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Hip/Buttocks - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Thigh (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Thigh (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Thigh (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Thigh (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Thigh (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Thigh (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Knee (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Knee (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Knee (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Knee (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Knee (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Knee (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Leg (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Leg (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Leg (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Leg (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Leg (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Lower Leg (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Foot (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Foot (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Foot (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Foot (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Foot (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"section": "MSK", "sectionLabel": "IV.7 MUSCULOSKELETAL (Cornell MSDQ)", "header": "Foot (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FVC (L)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FVC (% predicted)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEV1 (L)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEV1 (% predicted)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "PEF (L/s)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "PEF (% predicted)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEV1/FVC (%)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF25 (L/s)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF25 (% predicted)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF50 (L/s)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF50 (% predicted)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF75 (L/s)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF75 (% predicted)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF25-75 (L/s)", "kind": "num", "options": null}, {"section": "CLIN", "sectionLabel": "V. CLINICAL EXAM - SPIROMETRY", "header": "FEF25-75 (% predicted)", "kind": "num", "options": null}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "Uses Any Preventive Measures", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "PPE: Mask", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "PPE: Gloves", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "PPE: Shoes", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "PPE: Goggles", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "PPE: Regular Health Check-ups", "kind": "dropdown", "options": ["Yes", "No"]}, {"section": "PPE", "sectionLabel": "VI. PROTECTIVE MEASURES", "header": "PPE: Others (specify)", "kind": "text", "options": null}];
+const CHUNKS = [{"name": "Identity & Socio-demographic", "fields": [{"header": "Participant ID", "kind": "text", "options": null}, {"header": "Date of Data Collection", "kind": "date", "options": null}, {"header": "Factory Name", "kind": "text", "options": null}, {"header": "Process Group (Ergonomic Checklist)", "kind": "dropdown", "options": ["Mixing", "Filling", "Drying", "Packing", "Pellet making", "Burning waste", "Fuse making"]}, {"header": "Ergonomic Risk Level", "kind": "dropdown", "options": ["High", "Medium", "Low"]}, {"header": "Name", "kind": "text", "options": null}, {"header": "Age (years)", "kind": "num", "options": null}, {"header": "Gender", "kind": "dropdown", "options": ["Male", "Female", "Others"]}, {"header": "Address", "kind": "text", "options": null}, {"header": "Place of Residence", "kind": "dropdown", "options": ["Urban", "Rural"]}, {"header": "Literacy Status (Can Read/Write)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Highest Educational Qualification", "kind": "dropdown", "options": ["No formal education", "Primary school", "Middle school", "High school", "Higher secondary school", "Graduate/Degree/Diploma"]}, {"header": "Type of Employment", "kind": "dropdown", "options": ["Permanent", "Temporary", "Daily wage"]}, {"header": "Any Previous Employment", "kind": "text", "options": null}, {"header": "Marital Status", "kind": "dropdown", "options": ["Married", "Unmarried", "Separated", "Divorced", "Widow/Widower"]}, {"header": "No. of Children", "kind": "num", "options": null}, {"header": "Number of Family Members", "kind": "num", "options": null}, {"header": "Type of House", "kind": "dropdown", "options": ["Pucca", "Kutcha", "Semi-pucca"]}, {"header": "Ownership of House", "kind": "dropdown", "options": ["Owned", "Rented", "Temporary", "Employer provided"]}, {"header": "Household Members Engaged in Firecracker Work", "kind": "num", "options": null}, {"header": "Avg. Monthly Income from this Work (Rs)", "kind": "num", "options": null}, {"header": "Monthly Family Income (Rs)", "kind": "num", "options": null}, {"header": "Income via Firecracker Work (Rs)", "kind": "num", "options": null}, {"header": "Income via Other Occupation (Rs)", "kind": "num", "options": null}, {"header": "Socio-Economic Status (Modified BG Prasad)", "kind": "dropdown", "options": ["Class I", "Class II", "Class III", "Class IV", "Class V"]}, {"header": "Height (cm)", "kind": "num", "options": null}, {"header": "Weight (kg)", "kind": "num", "options": null}, {"header": "BP Systolic (mmHg)", "kind": "num", "options": null}, {"header": "BP Diastolic (mmHg)", "kind": "num", "options": null}]}, {"name": "Occupation & Co-morbidities", "fields": [{"header": "Years Working in Firecracker Industry", "kind": "num", "options": null}, {"header": "Current Job Role", "kind": "dropdown", "options": ["Mixing", "Filling", "Rolling", "Packing", "Quality check", "Loading/unloading", "Others"]}, {"header": "Work Pattern", "kind": "dropdown", "options": ["Full year", "Seasonal", "Occasional"]}, {"header": "Hours Worked per Day", "kind": "num", "options": null}, {"header": "Days Worked per Week", "kind": "num", "options": null}, {"header": "Receives Breaks during Work Day", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "If Yes, Break Duration", "kind": "text", "options": null}, {"header": "Receives Employment Benefits", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "If Yes, Specify (PF/ESI/Bonus/Paid leave/Others)", "kind": "text", "options": null}, {"header": "Diabetes Mellitus - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Diabetes Mellitus - Duration of Illness", "kind": "text", "options": null}, {"header": "Diabetes Mellitus - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Diabetes Mellitus - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Hypertension - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Hypertension - Duration of Illness", "kind": "text", "options": null}, {"header": "Hypertension - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Hypertension - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Cardiovascular Disease - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Cardiovascular Disease - Duration of Illness", "kind": "text", "options": null}, {"header": "Cardiovascular Disease - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Cardiovascular Disease - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Cerebrovascular Disease - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Cerebrovascular Disease - Duration of Illness", "kind": "text", "options": null}, {"header": "Cerebrovascular Disease - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Cerebrovascular Disease - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "COPD/Asthma - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "COPD/Asthma - Duration of Illness", "kind": "text", "options": null}, {"header": "COPD/Asthma - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "COPD/Asthma - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Thyroid - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Thyroid - Duration of Illness", "kind": "text", "options": null}, {"header": "Thyroid - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Thyroid - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Dermatological Problems - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Dermatological Problems - Duration of Illness", "kind": "text", "options": null}, {"header": "Dermatological Problems - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Dermatological Problems - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Other Co-morbidity - Specify Name", "kind": "text", "options": null}, {"header": "Other Co-morbidity - Present (Yes/No)", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Other Co-morbidity - Duration of Illness", "kind": "text", "options": null}, {"header": "Other Co-morbidity - Consulted a Doctor", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Other Co-morbidity - On Treatment", "kind": "dropdown", "options": ["Yes", "No"]}]}, {"name": "Injury, Respiratory & Hearing", "fields": [{"header": "Injury in Past 12 Months", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Number of Injuries (if Yes)", "kind": "num", "options": null}, {"header": "See 'Injury Details' Sheet for Full Records", "kind": "text", "options": null}, {"header": "Currently Smokes Tobacco / Smoked in Last Month", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Ever Had Asthma", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Ever Had Pneumonia", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Ever Had Tuberculosis", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Ever Had Other Lung Problem (specify)", "kind": "text", "options": null}, {"header": "Symptom: Shortness of Breath", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: SOB Walking Fast / Incline", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: SOB Walking with Others at Ordinary Pace", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: Must Stop for Breath at Own Pace", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: SOB Interferes with Job", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: Cough", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: Wheeze", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: Chest Pain", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Symptom: Other (specify)", "kind": "text", "options": null}, {"header": "Ever Had Ear Injury / Broken Eardrum", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Difficulty Hearing", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Wears a Hearing Aid", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Any Other Hearing/Ear Problem (specify)", "kind": "text", "options": null}, {"header": "Rinne's Test - Right Ear (AC vs BC)", "kind": "text", "options": null}, {"header": "Rinne's Test - Left Ear (AC vs BC)", "kind": "text", "options": null}, {"header": "Rinne's Test - Inference", "kind": "dropdown", "options": ["Normal", "Abnormal"]}, {"header": "Schwabach's Test - Right Ear", "kind": "text", "options": null}, {"header": "Schwabach's Test - Left Ear", "kind": "text", "options": null}, {"header": "Schwabach's Test - Inference", "kind": "dropdown", "options": ["Normal", "Abnormal"]}]}, {"name": "Vision & Mental Health", "fields": [{"header": "Ever Lost Vision (Temp/Perm) in Either Eye", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "If Yes, Which Eye", "kind": "dropdown", "options": ["Right eye", "Left eye", "Both eyes", "NA"]}, {"header": "Wears Contact Lenses", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Wears Glasses", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Colour Blind", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "Any Other Eye Problem (specify)", "kind": "text", "options": null}, {"header": "WHO Distance Vision - Right Eye", "kind": "text", "options": null}, {"header": "WHO Distance Vision - Left Eye", "kind": "text", "options": null}, {"header": "WHO Near Vision - Right Eye", "kind": "text", "options": null}, {"header": "WHO Near Vision - Left Eye", "kind": "text", "options": null}, {"header": "Vision Inference", "kind": "dropdown", "options": ["Normal", "Abnormal"]}, {"header": "WHO1: I have felt cheerful and in good spirits (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"header": "WHO2: I have felt calm and relaxed (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"header": "WHO3: I have felt active and vigorous (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"header": "WHO4: I woke up feeling fresh and rested (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}, {"header": "WHO5: My daily life has been filled with things that interest me (0-5)", "kind": "dropdown", "options": ["0", "1", "2", "3", "4", "5"]}]}, {"name": "Musculoskeletal (Neck-Lower Back-Wrist)", "fields": [{"header": "Respondent Sex (for norm reference)", "kind": "dropdown", "options": ["Female", "Male"]}, {"header": "Neck - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Neck - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Neck - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Shoulder (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Shoulder (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Shoulder (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Shoulder (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Shoulder (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Shoulder (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Upper Back - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Upper Back - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Upper Back - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Upper Arm (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Upper Arm (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Upper Arm (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Upper Arm (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Upper Arm (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Upper Arm (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Lower Back - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Lower Back - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Lower Back - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Forearm (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Forearm (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Forearm (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Forearm (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Forearm (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Forearm (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Wrist (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Wrist (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}]}, {"name": "Musculoskeletal (Hip-Foot)", "fields": [{"header": "Wrist (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Wrist (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Wrist (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Wrist (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Hip/Buttocks - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Hip/Buttocks - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Hip/Buttocks - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Thigh (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Thigh (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Thigh (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Thigh (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Thigh (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Thigh (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Knee (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Knee (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Knee (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Knee (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Knee (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Knee (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Lower Leg (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Lower Leg (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Lower Leg (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Lower Leg (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Lower Leg (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Lower Leg (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Foot (Right) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Foot (Right) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Foot (Right) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}, {"header": "Foot (Left) - Frequency (last work week)", "kind": "dropdown", "options": ["Never", "1-2 times last week", "3-4 times last week", "Once every day", "Several times every day"]}, {"header": "Foot (Left) - Discomfort Level", "kind": "dropdown", "options": ["NA", "Slightly uncomfortable", "Moderately uncomfortable", "Very uncomfortable"]}, {"header": "Foot (Left) - Interference with Work", "kind": "dropdown", "options": ["NA", "Not at all", "Slightly interfered", "Substantially interfered"]}]}, {"name": "Spirometry & Protective Measures", "fields": [{"header": "FVC (L)", "kind": "num", "options": null}, {"header": "FVC (% predicted)", "kind": "num", "options": null}, {"header": "FEV1 (L)", "kind": "num", "options": null}, {"header": "FEV1 (% predicted)", "kind": "num", "options": null}, {"header": "PEF (L/s)", "kind": "num", "options": null}, {"header": "PEF (% predicted)", "kind": "num", "options": null}, {"header": "FEV1/FVC (%)", "kind": "num", "options": null}, {"header": "FEF25 (L/s)", "kind": "num", "options": null}, {"header": "FEF25 (% predicted)", "kind": "num", "options": null}, {"header": "FEF50 (L/s)", "kind": "num", "options": null}, {"header": "FEF50 (% predicted)", "kind": "num", "options": null}, {"header": "FEF75 (L/s)", "kind": "num", "options": null}, {"header": "FEF75 (% predicted)", "kind": "num", "options": null}, {"header": "FEF25-75 (L/s)", "kind": "num", "options": null}, {"header": "FEF25-75 (% predicted)", "kind": "num", "options": null}, {"header": "Uses Any Preventive Measures", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "PPE: Mask", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "PPE: Gloves", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "PPE: Shoes", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "PPE: Goggles", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "PPE: Regular Health Check-ups", "kind": "dropdown", "options": ["Yes", "No"]}, {"header": "PPE: Others (specify)", "kind": "text", "options": null}]}];
+const COMPUTED_HEADERS = new Set(["S.No","BMI (auto)","WHO-5 Raw Score (0-25, auto)","WHO-5 Percentage Score (0-100, auto)"]);
+const WHO_ITEMS = ["WHO1: I have felt cheerful and in good spirits (0-5)","WHO2: I have felt calm and relaxed (0-5)","WHO3: I have felt active and vigorous (0-5)","WHO4: I woke up feeling fresh and rested (0-5)","WHO5: My daily life has been filled with things that interest me (0-5)"];
+
+let appPassword = localStorage.getItem('appPassword') || '';
+let uploadedImages = [];
+let formData = {};
+let editingId = null;
+let participants = []; // [{id, data}]
+
+// ---------- password gate ----------
+async function checkPassword(pw){
+  try{
+    const r = await fetch('/api/get-workers', { headers: { 'x-app-password': pw } });
+    return r.status !== 403;
+  }catch(e){ return false; }
+}
+async function tryEnter(pw){
+  const ok = await checkPassword(pw);
+  if(ok){
+    appPassword = pw;
+    localStorage.setItem('appPassword', pw);
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadWorkers();
+  } else {
+    document.getElementById('gateError').style.display = 'block';
+  }
+}
+document.getElementById('gateSubmit').addEventListener('click', () => {
+  tryEnter(document.getElementById('gatePassword').value.trim());
+});
+document.getElementById('gatePassword').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') tryEnter(e.target.value.trim());
+});
+if(appPassword) tryEnter(appPassword);
+
+function authHeaders(extra){
+  return Object.assign({ 'x-app-password': appPassword }, extra || {});
+}
+
+// ---------- upload handling ----------
+const MAX_DIMENSION = 1400;
+const JPEG_QUALITY = 0.75;
+
+function processImageFile(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`Could not read file ${file.name}`));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error(`${file.name} could not be opened. If it's HEIC, try converting to JPEG first.`));
+      img.onload = () => {
+        let { width, height } = img;
+        if(width > MAX_DIMENSION || height > MAX_DIMENSION){
+          const scale = MAX_DIMENSION / Math.max(width, height);
+          width = Math.round(width * scale); height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+        resolve({ name:file.name, base64:dataUrl.split(',')[1], mediaType:'image/jpeg', dataUrl });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const thumbsEl = document.getElementById('thumbs');
+const extractBtn = document.getElementById('extractBtn');
+
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+async function handleFiles(fileList){
+  for(const file of [...fileList]){
+    try{
+      const processed = await processImageFile(file);
+      uploadedImages.push(processed);
+      renderThumbs();
+    }catch(e){
+      console.error(e);
+      showToast(e.message || `Could not process ${file.name}.`);
+    }
+  }
+}
+function renderThumbs(){
+  thumbsEl.innerHTML = '';
+  uploadedImages.forEach((img, i) => {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    div.innerHTML = `<img src="${img.dataUrl}"><button data-i="${i}">&times;</button>`;
+    thumbsEl.appendChild(div);
+  });
+  thumbsEl.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => { uploadedImages.splice(+b.dataset.i, 1); renderThumbs(); });
+  });
+  extractBtn.disabled = uploadedImages.length === 0;
+}
+
+// ---------- extraction (via our own backend) ----------
+async function callExtract(chunk){
+  const images = uploadedImages.map(img => ({ media_type: img.mediaType, data: img.base64 }));
+  const resp = await fetch('/api/extract', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ images, chunk })
+  });
+  if(resp.status === 403){ throw new Error('App password rejected — please reload and re-enter it.'); }
+  const result = await resp.json();
+  if(!result.success){ throw new Error(`"${chunk.name}": ${result.error || 'unknown error'}`); }
+  return result.data;
+}
+
+const progressWrap = document.getElementById('progressWrap');
+const progressBar = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
+
+document.getElementById('extractBtn').addEventListener('click', async () => {
+  extractBtn.disabled = true;
+  progressWrap.style.display = 'block';
+  let merged = {};
+  for(let i=0; i<CHUNKS.length; i++){
+    const chunk = CHUNKS[i];
+    progressLabel.textContent = `Reading ${i+1} of ${CHUNKS.length}: ${chunk.name}...`;
+    progressBar.style.width = `${Math.round((i/CHUNKS.length)*100)}%`;
+    try{
+      const result = await callExtract(chunk);
+      const uncertain = result._uncertain || [];
+      delete result._uncertain;
+      merged = { ...merged, ...result };
+      merged._uncertain_fields = [...(merged._uncertain_fields||[]), ...uncertain];
+    }catch(e){
+      console.error('chunk failed', chunk.name, e);
+      showToast(e.message);
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+  progressBar.style.width = '100%';
+  progressLabel.textContent = 'Done — review the answers below.';
+  formData = { ...formData, ...merged };
+  renderForm();
+  setTimeout(() => { progressWrap.style.display = 'none'; }, 1500);
+  extractBtn.disabled = false;
+  showToast('Extraction complete — please review before saving.');
+});
+
+// ---------- form rendering ----------
+const formSectionsEl = document.getElementById('formSections');
+
+function groupedFields(){
+  const groups = []; let cur = null;
+  FULL_FIELDS.forEach(f => {
+    if(COMPUTED_HEADERS.has(f.header)) return;
+    if(!cur || cur.section !== f.section){ cur = { section:f.section, label:f.sectionLabel, fields:[] }; groups.push(cur); }
+    cur.fields.push(f);
+  });
+  return groups;
+}
+function computeBMI(){
+  const h = parseFloat(formData["Height (cm)"]), w = parseFloat(formData["Weight (kg)"]);
+  if(!h || !w) return '';
+  return (w / ((h/100)**2)).toFixed(1);
+}
+function computeWHORaw(){
+  let has=false, sum=0;
+  WHO_ITEMS.forEach(k => { const v = parseFloat(formData[k]); if(!isNaN(v)){ has=true; sum+=v; } });
+  return has ? sum : '';
+}
+function computeWHOPct(){ const raw = computeWHORaw(); return raw === '' ? '' : raw*4; }
+
+function renderForm(){
+  formSectionsEl.innerHTML = '';
+  const groups = groupedFields();
+  groups.forEach((g, gi) => {
+    const filledCount = g.fields.filter(f => formData[f.header]).length;
+    const det = document.createElement('details');
+    det.className = 'section'; det.open = gi === 0;
+    const summary = document.createElement('summary');
+    summary.innerHTML = `<span>${g.label}</span><span class="count">${filledCount}/${g.fields.length} filled</span>`;
+    det.appendChild(summary);
+    const grid = document.createElement('div'); grid.className = 'field-grid';
+    g.fields.forEach(f => {
+      const wrap = document.createElement('div'); wrap.className = 'field';
+      const label = document.createElement('label'); label.textContent = f.header;
+      wrap.appendChild(label);
+      let input;
+      if(f.kind === 'dropdown'){
+        input = document.createElement('select');
+        const blankOpt = document.createElement('option'); blankOpt.value=''; blankOpt.textContent='—';
+        input.appendChild(blankOpt);
+        f.options.forEach(o => {
+          const opt = document.createElement('option'); opt.value=o; opt.textContent=o;
+          if(formData[f.header]===o) opt.selected=true;
+          input.appendChild(opt);
+        });
+      } else {
+        input = document.createElement('input');
+        input.type = (f.kind==='num') ? 'text' : (f.kind==='date' ? 'date' : 'text');
+        input.value = formData[f.header] || '';
+      }
+      input.addEventListener('input', () => {
+        formData[f.header] = input.value;
+        refreshComputedFields();
+        summary.querySelector('.count').textContent = `${g.fields.filter(ff => formData[ff.header]).length}/${g.fields.length} filled`;
+      });
+      wrap.appendChild(input);
+      grid.appendChild(wrap);
+      if(f.header === "Weight (kg)") grid.appendChild(computedFieldEl("BMI (auto)", computeBMI()));
+      if(f.header === WHO_ITEMS[4]){
+        grid.appendChild(computedFieldEl("WHO-5 Raw Score (0-25, auto)", computeWHORaw()));
+        grid.appendChild(computedFieldEl("WHO-5 Percentage Score (0-100, auto)", computeWHOPct()));
+      }
+    });
+    det.appendChild(grid);
+    formSectionsEl.appendChild(det);
+  });
+}
+function computedFieldEl(header, value){
+  const wrap = document.createElement('div'); wrap.className = 'field computed';
+  wrap.id = `computed-${header.replace(/[^a-z0-9]/gi,'')}`;
+  const label = document.createElement('label'); label.textContent = header;
+  const input = document.createElement('input'); input.type='text'; input.readOnly=true; input.value=value;
+  wrap.appendChild(label); wrap.appendChild(input);
+  return wrap;
+}
+function refreshComputedFields(){
+  const bmiEl = document.querySelector(`#computed-BMIauto input`); if(bmiEl) bmiEl.value = computeBMI();
+  const rawEl = document.querySelector(`#computed-WHO5RawScore025auto input`); if(rawEl) rawEl.value = computeWHORaw();
+  const pctEl = document.querySelector(`#computed-WHO5PercentageScore0100auto input`); if(pctEl) pctEl.value = computeWHOPct();
+}
+
+document.getElementById('newFormBtn').addEventListener('click', () => {
+  formData = {}; uploadedImages = []; editingId = null;
+  renderThumbs(); renderForm();
+  showToast('Blank form ready.');
+});
+
+// ---------- backend: load / save / delete ----------
+async function loadWorkers(){
+  try{
+    const r = await fetch('/api/get-workers', { headers: authHeaders() });
+    const data = await r.json();
+    participants = data.workers || [];
+  }catch(e){ console.error(e); participants = []; }
+  renderQueue();
+}
+document.getElementById('refreshBtn').addEventListener('click', loadWorkers);
+
+function renderQueue(){
+  const el = document.getElementById('queueList');
+  document.getElementById('statBadge').textContent = `${participants.length} worker${participants.length===1?'':'s'} saved`;
+  if(participants.length === 0){
+    el.innerHTML = '<div class="empty-state">No workers saved yet.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  participants.forEach(p => {
+    const div = document.createElement('div'); div.className = 'queue-item';
+    const name = p.data['Name'] || '(unnamed)';
+    const pid = p.data['Participant ID'] || p.id;
+    div.innerHTML = `<button class="qdel" data-id="${p.id}">remove</button><div class="qname">${name}</div><div class="qid">${pid}</div>`;
+    div.addEventListener('click', (e) => {
+      if(e.target.classList.contains('qdel')) return;
+      formData = { ...p.data }; editingId = p.id; uploadedImages = [];
+      renderThumbs(); renderForm();
+      showToast(`Editing ${name}. Save to update.`);
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+    el.appendChild(div);
+  });
+  el.querySelectorAll('.qdel').forEach(b => {
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await fetch('/api/delete-worker', { method:'POST', headers: authHeaders({'Content-Type':'application/json'}), body: JSON.stringify({ id: b.dataset.id }) });
+      await loadWorkers();
+    });
+  });
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  if(!formData['Name'] && !formData['Participant ID']){
+    showToast('Add at least a Name or Participant ID before saving.');
+    return;
+  }
+  const id = editingId || (formData['Participant ID'] || '').trim() || `w_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+  try{
+    const r = await fetch('/api/save-worker', {
+      method:'POST', headers: authHeaders({'Content-Type':'application/json'}),
+      body: JSON.stringify({ id, data: formData })
+    });
+    if(r.status === 403){ showToast('App password rejected — reload and re-enter it.'); return; }
+    const result = await r.json();
+    if(!result.success){ showToast(`Save failed: ${result.error}`); return; }
+  }catch(e){ showToast(`Save failed: ${e.message}`); return; }
+
+  await loadWorkers();
+  showToast('Worker saved to the dataset.');
+  formData = {}; uploadedImages = []; editingId = null;
+  renderThumbs(); renderForm();
+});
+
+// ---------- export ----------
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if(participants.length === 0){ showToast('No saved workers to export yet.'); return; }
+  const headers = FULL_FIELDS.map(f => f.header).concat(['Fields to Verify (AI was unsure)']);
+  const rows = [headers];
+  participants.forEach((p, i) => {
+    const d = p.data;
+    const row = FULL_FIELDS.map(f => {
+      if(f.header === 'S.No') return i + 1;
+      if(f.header === 'BMI (auto)'){
+        const h = parseFloat(d["Height (cm)"]), w = parseFloat(d["Weight (kg)"]);
+        return (h && w) ? +(w/((h/100)**2)).toFixed(1) : '';
+      }
+      if(f.header === 'WHO-5 Raw Score (0-25, auto)' || f.header === 'WHO-5 Percentage Score (0-100, auto)'){
+        let has=false, sum=0;
+        WHO_ITEMS.forEach(k => { const v = parseFloat(d[k]); if(!isNaN(v)){ has=true; sum+=v; } });
+        if(!has) return '';
+        return f.header.includes('Percentage') ? sum*4 : sum;
+      }
+      return d[f.header] !== undefined ? d[f.header] : '';
+    });
+    row.push((d._uncertain_fields || []).join(', '));
+    rows.push(row);
+  });
+  const wb = XLSX.utils.book_new();
+  const wsData = XLSX.utils.aoa_to_sheet(rows);
+  wsData['!cols'] = headers.map(() => ({ wch: 20 }));
+  XLSX.utils.book_append_sheet(wb, wsData, 'Data Entry');
+
+  const cbRows = [['Section','Column Header','Entry Type','Allowed Values / Notes']];
+  FULL_FIELDS.forEach(f => cbRows.push([f.sectionLabel, f.header, f.kind, f.options ? f.options.join(', ') : '']));
+  const wsCb = XLSX.utils.aoa_to_sheet(cbRows);
+  wsCb['!cols'] = [{wch:30},{wch:40},{wch:12},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsCb, 'Codebook');
+
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `firecracker_worker_data_${today}.xlsx`);
+  showToast(`Exported ${participants.length} workers to Excel.`);
+});
+
+// ---------- toast ----------
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3400);
+}
+
+renderForm();
+</script>
+</body>
+</html>

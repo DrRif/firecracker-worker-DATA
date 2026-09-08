@@ -1,0 +1,6 @@
+{
+  "name": "firecracker-worker-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sivakasi Firecracker Worker Study — proforma scan-to-data web app (Vercel + Upstash)."
+}

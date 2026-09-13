@@ -58,6 +58,15 @@ async function callOllama(images, fields) {
         messages: [{ role: "user", content: prompt, images: imageBase64s }],
         stream: false,
         format: "json", // ask Ollama to constrain output to valid JSON
+        options: {
+          // Ollama's default context window (4096 tokens) is too small for
+          // several photos at once. This raises it — but on an 8GB GPU,
+          // going too high risks running out of memory instead, since the
+          // model weights alone already use most of that 8GB. If you see
+          // an out-of-memory error instead of the old "exceeds context
+          // size" error, this number needs to come back down, not up.
+          num_ctx: 8192,
+        },
       }),
       // Vercel Hobby caps functions at 60s anyway, but guard against hanging forever
       signal: AbortSignal.timeout(55000),

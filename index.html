@@ -206,8 +206,16 @@ function authHeaders(extra){
 }
 
 // ---------- upload handling ----------
-const MAX_DIMENSION = 1400;
-const JPEG_QUALITY = 0.75;
+// Kept smaller than a cloud-API setup would need, specifically because a
+// local 8GB GPU has limited room for both the model weights and the
+// "context" (prompt + images + answer) in memory at once. Smaller photos
+// mean fewer tokens per image, leaving more room to fit all of them in a
+// single request without running out of VRAM or hitting Ollama's context
+// limit. If extraction quality suffers on fine handwriting, this is the
+// first number to reconsider — there's a real trade-off between legibility
+// and what fits in 8GB.
+const MAX_DIMENSION = 900;
+const JPEG_QUALITY = 0.65;
 
 function processImageFile(file){
   return new Promise((resolve, reject) => {

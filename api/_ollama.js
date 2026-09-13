@@ -65,7 +65,7 @@ async function callOllama(images, fields) {
           // model weights alone already use most of that 8GB. If you see
           // an out-of-memory error instead of the old "exceeds context
           // size" error, this number needs to come back down, not up.
-          num_ctx: 8192,
+          num_ctx: 12288,
         },
       }),
       // Vercel Hobby caps functions at 60s anyway, but guard against hanging forever

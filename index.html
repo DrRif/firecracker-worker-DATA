@@ -270,7 +270,10 @@ function renderThumbs(){
   extractBtn.disabled = uploadedImages.length === 0;
 }
 
-// ---------- extraction (via our own backend) ----------
+// ---------- extraction (via our own backend, calling YOUR local model) ----------
+// Chunked on purpose: each call handles one form section (not all 197
+// fields at once), so every request finishes quickly even on a modest
+// local GPU, well within the hosting platform's per-request time limit.
 async function callExtract(chunk){
   const images = uploadedImages.map(img => ({ media_type: img.mediaType, data: img.base64 }));
   const resp = await fetch('/api/extract', {
